@@ -48,6 +48,11 @@ def process_video():
     file_path = os.path.join('static', filename)
     file.save(file_path)
     
+    # Get parameters from the request
+    iou_thr = float(request.form['iou_thr'])
+    skip_box_thr = float(request.form['skip_box_thr'])
+    p = float(request.form['p'])
+
     # Open the video file
     cap = cv2.VideoCapture(file_path)
     if not cap.isOpened():
@@ -92,12 +97,9 @@ def process_video():
         cv2.imwrite(temp_image_path, frame)
 
         # Run predictions on the single frame using run_on_single_image
-        p = 0.001  # Min confidence threshold for rare classes
-        iou_thr = 0.5  # IOU threshold for WBF
-        sbthr = 0.00001  # Skip box threshold for WBF
         plot = False  # Flag to plot the results, set to False for video processing
 
-        results = run_on_single_image(model_weights_list, temp_image_path, p, iou_thr, sbthr, plot)
+        results = run_on_single_image(model_weights_list, temp_image_path, p, iou_thr, skip_box_thr, plot)
 
         # Debugging statement to understand the structure of results
         # print(f"Results for frame {frame_counter}: {results}")
@@ -155,7 +157,8 @@ def process_video():
     if os.path.exists(file_path):
         os.remove(file_path)
         
-    return jsonify({"video_url": f"/static/compressed_{filename}"})
+    return jsonify({"original_video_url": f"/static/{filename}", "processed_video_url": f"/static/compressed_{filename}"})
+
 
 @app.route('/download/<filename>', methods=['GET'])
 def download_file(filename):
