@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Video for Object Detection</title>
+    <style>
+        #video-container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .video-box {
+            width: 45%;
+        }
+
+        .video-box video {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload a Video for Object Detection</h1>
+    
+    <!-- Form for video upload -->
+    <form id="upload-video-form" action="/process_video" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="video/*">
+        <input type="submit" value="Upload Video">
+    </form>
+
+    <div id="video-container">
+        <div id="original-video-container" class="video-box">
+            <h2>Original Video</h2>
+            <video id="original-video" controls>
+                <source id="original-video-source" src="" type="video/mp4">
+            </video>
+        </div>
+
+        <div id="processed-video-container" class="video-box">
+            <h2>Processed Video</h2>
+            <video id="processed-video" controls>
+                <source id="processed-video-source" src="" type="video/mp4">
+            </video>
+            <p><a id="download-link" href="#" download>Download Processed Video</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Handle video upload
+        document.getElementById('upload-video-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            fetch('/process_video', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Original Video URL:", data.original_video_url); // Debug: Log original video URL
+                console.log("Processed Video URL:", data.processed_video_url); // Debug: Log processed video URL
+    
+                // Display original video
+                const originalVideoSource = document.getElementById('original-video-source');
+                originalVideoSource.src = data.original_video_url;
+                document.getElementById('original-video').load();
+                document.getElementById('original-video-container').style.display = 'block';
+    
+                // Display processed video
+                const processedVideoSource = document.getElementById('processed-video-source');
+                processedVideoSource.src = data.processed_video_url;
+                document.getElementById('processed-video').load();
+                document.getElementById('processed-video-container').style.display = 'block';
+    
+                // Update download link
+                const downloadLink = document.getElementById('download-link');
+                downloadLink.href = data.processed_video_url;
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+    
+</body>
+</html>
