@@ -5,10 +5,10 @@ import cv2
 import numpy as np
 from werkzeug.utils import secure_filename
 import subprocess
-from wbf import *
-from visualize import *
-from minority_optimizer import *
-from virtual_expander import *
+from utils.wbf import *
+from utils.visualize import *
+from utils.minority_optimizer import *
+from utils.virtual_expander import *
 from test import *
 app = Flask(__name__)
 
@@ -27,7 +27,6 @@ def get_model_weights():
 
 # Create models using the provided weights
 model_weights_list = get_model_weights()
-models, model_names = create_models(model_weights_list)
 
 # Define class names
 class_names = ['motorbike', 'DHelmet', 'DNoHelmet', 'P1Helmet', 'P1NoHelmet', 'P2Helmet', 'P2NoHelmet', 'P0Helmet', 'P0NoHelmet']
@@ -112,8 +111,8 @@ def process_video():
             if isinstance(preds, list):
                 # Directly use preds since it's a single prediction list
                 x1, y1, x2, y2 = [preds[2], preds[3], preds[4], preds[5]]
-                label = int(preds[8])
-                score = preds[9]
+                label = int(preds[6])
+                score = preds[7]
                 boxes.append([x1, y1, x2, y2])
                 labels.append(label)
                 scores.append(score)

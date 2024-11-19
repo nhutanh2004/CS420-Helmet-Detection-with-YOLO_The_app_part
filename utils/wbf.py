@@ -54,7 +54,7 @@ def fuse(
     # Hoặc tắt cảnh báo cụ thể
     warnings.filterwarnings("ignore", message="Zero area box skipped*")
 
-    #print("\n\tFusing results with iou_thr:", iou_thr, "skip_box_thr:", skip_box_thr)
+    print("\n\tFusing results with iou_thr:", iou_thr, "skip_box_thr:", skip_box_thr)
 
     # Iterate through all images
     if not single_image:
@@ -182,4 +182,35 @@ def fuse(
                 )
 
     # results[i] = [video_id, frame_id, x1, y1, x2, y2, img_w, img_h, label, score]
+    return results
+
+
+def fuse_frame(all_boxes, all_labels, all_scores, iou_thr, skip_box_thr, frame_name, width, height):
+    results = []
+    vid, fid = frame_name.split(".jpg")[0].split("_")
+    # Replace `int(vid)` with `vid` to keep it as a string
+    video_id = vid
+    frame_id = int(fid.replace("frame", ""))
+
+    # your existing fusion logic
+    boxes, scores, labels = weighted_boxes_fusion(
+        all_boxes, all_scores, all_labels, iou_thr=iou_thr, skip_box_thr=skip_box_thr
+    )
+
+    for i in range(len(boxes)):
+        results.append(
+            [
+                video_id,
+                frame_id,
+                boxes[i][0] * width,
+                boxes[i][1] * height,
+                boxes[i][2] * width,
+                boxes[i][3] * height,
+                width,
+                height,
+                labels[i],
+                scores[i],
+            ]
+        )
+
     return results

@@ -31,7 +31,7 @@ def minority(p, results, n=9):
         n_max_class / mean_samples
     )  # mean samples per class / max samples in a class
 
-    #print(f"\n\tclasses count : {classes_count}")
+    print(f"\n\tclasses count : {classes_count}")
 
     rare_classes = set()
 
@@ -54,8 +54,8 @@ def minority(p, results, n=9):
                 # print("\t\tupdating min_thresh, new threshold : ", score)
                 min_thresh = score
 
-    #print(f"\n\tRare classes : {rare_classes}")
-    #print(f"\nMin_thresh = : {min_thresh}")
+    print(f"\n\tRare classes : {rare_classes}")
+    print(f"\nMin_thresh = : {min_thresh}")
 
     return max(min_thresh, p), rare_classes
 
@@ -105,6 +105,6 @@ def find_max_on_train():
             json.dump({"classes_count": classes_count}, f)
 
     n_max_class = max(classes_count)
-    #print(f"\nclass counts : {classes_count}")
+    print(f"\nclass counts : {classes_count}")
     return n_max_class, classes_count
     # max number of samples in a class, number of samples in each class
