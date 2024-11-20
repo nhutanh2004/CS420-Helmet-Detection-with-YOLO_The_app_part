@@ -152,9 +152,9 @@ def process_video():
     if os.path.exists(output_path):
        os.remove(output_path)
     
-    # Delete the original video file
-    if os.path.exists(file_path):
-        os.remove(file_path)
+    # # Delete the original video file
+    # if os.path.exists(file_path):
+    #     os.remove(file_path)
         
     return jsonify({"original_video_url": f"/static/{filename}", "processed_video_url": f"/static/compressed_{filename}"})
 
