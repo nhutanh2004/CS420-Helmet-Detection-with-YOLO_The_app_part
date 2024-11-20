@@ -213,7 +213,7 @@ def process_video():
     return jsonify(
         {
             "original_video_url": f"/static/{filename}",
-            "processed_video_url": f"/static/compressed_{filename}",
+            "processed_video_url": f"/{compressed_output_path}",
         }
     )
 
