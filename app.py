@@ -171,12 +171,12 @@ def process_video():
     # Compress the video using ffmpeg command line and capture stderr
     counter = 0
     compressed_output_path = os.path.join(
-        "static", f"{filename.split(".")[0]}_output.mp4"
+        "static", f"{filename.split(".")[0]}.mp4"
     )
     while os.path.exists(compressed_output_path):
         counter += 1
         compressed_output_path = os.path.join(
-            "static", f"{filename.split(".")[0]}_output{counter}.mp4"
+            "static", f"{filename.split(".")[0]}_{counter}.mp4"
         )
 
     ffmpeg_cmd = [
@@ -206,14 +206,14 @@ def process_video():
     if os.path.exists(output_path):
         os.remove(output_path)
 
-    # Delete the original video file
-    if os.path.exists(file_path):
-        os.remove(file_path)
+    # # Delete the original video file
+    # if os.path.exists(file_path):
+    #     os.remove(file_path)
 
     return jsonify(
         {
             "original_video_url": f"/static/{filename}",
-            "processed_video_url": f"/static/compressed_{filename}",
+            "processed_video_url": f"/{compressed_output_path}",
         }
     )
 
