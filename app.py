@@ -67,7 +67,7 @@ class_colors = [
 ]
 
 # Initialize DeepSORT
-tracker = DeepSort(max_age=30, n_init=2, nms_max_overlap=1.0, max_cosine_distance=0.1, nn_budget=None, override_track_class=None)
+tracker = DeepSort(max_age=30, n_init=2, max_cosine_distance=0.1, nn_budget=None, override_track_class=None)
 
 @app.route("/")
 def upload_video():
