@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Video for Object Detection</title>
+    <style>
+        #video-container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .video-box {
+            width: 45%;
+            display: none; /* Hide the video boxes initially */
+        }
+
+        .video-box video {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload a Video for Object Detection</h1>
+    
+    <!-- Form for video upload and parameters -->
+    <form id="upload-video-form" action="/process_video" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="video/*" required>
+        <label for="iou_thr">IoU Threshold:</label>
+        <input type="number" id="iou_thr" name="iou_thr" step="0.01" min="0" max="1" value="0.7" required>
+        <label for="skip_box_thr">Skip Box Threshold:</label>
+        <input type="number" id="skip_box_thr" name="skip_box_thr" step="0.0001" min="0" max="1" value="0.0001" required>
+        <label for="p">Minimum Minority Threshold:</label>
+        <input type="number" id="p" name="p" step="0.0001" min="0" max="1" value="0.0001" required>
+        <input type="submit" id="submit-button" value="Upload Video">
+    </form>
+
+    <div id="video-container">
+        <div id="original-video-container" class="video-box">
+            <h2>Original Video</h2>
+            <video id="original-video" controls>
+                <source id="original-video-source" src="" type="video/mp4">
+            </video>
+        </div>
+
+        <div id="processed-video-container" class="video-box">
+            <h2>Processed Video</h2>
+            <video id="processed-video" controls>
+                <source id="processed-video-source" src="" type="video/mp4">
+            </video>
+            <p><a id="download-link" href="#" download>Download Processed Video</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Ensure video containers are hidden initially
+        document.getElementById('original-video-container').style.display = 'none';
+        document.getElementById('processed-video-container').style.display = 'none';
+
+        // Handle video upload and parameter submission
+        document.getElementById('upload-video-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            var submitButton = document.getElementById('submit-button');
+
+            // Disable the submit button
+            submitButton.disabled = true;
+
+            fetch('/process_video', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Original Video URL:", data.original_video_url); // Debug: Log original video URL
+                console.log("Processed Video URL:", data.processed_video_url); // Debug: Log processed video URL
+
+                // Display original video if URL is available
+                const originalVideoSource = document.getElementById('original-video-source');
+                if (data.original_video_url) {
+                    originalVideoSource.src = data.original_video_url;
+                    document.getElementById('original-video').load();
+                    document.getElementById('original-video-container').style.display = 'block';
+                } else {
+                    document.getElementById('original-video-container').style.display = 'none';
+                }
+
+                // Display processed video if URL is available
+                const processedVideoSource = document.getElementById('processed-video-source');
+                if (data.processed_video_url) {
+                    processedVideoSource.src = data.processed_video_url;
+                    document.getElementById('processed-video').load();
+                    document.getElementById('processed-video-container').style.display = 'block';
+                } else {
+                    document.getElementById('processed-video-container').style.display = 'none';
+                }
+
+                // Update download link
+                const downloadLink = document.getElementById('download-link');
+                if (data.processed_video_url) {
+                    downloadLink.href = data.processed_video_url;
+                    downloadLink.style.display = 'block';
+                } else {
+                    downloadLink.style.display = 'none';
+                }
+
+                // Enable the submit button
+                submitButton.disabled = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Enable the submit button in case of error
+                submitButton.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>

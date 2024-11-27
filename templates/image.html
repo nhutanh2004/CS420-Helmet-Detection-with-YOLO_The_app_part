@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Image for Object Detection</title>
+    <style>
+        #image-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload an Image for Object Detection</h1>
+
+    <!-- Link to go back to the home page -->
+    <p><a href="/">Back to Home</a></p>
+    
+    <!-- Form for image upload -->
+    <form id="upload-image-form" action="/predict" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*">
+        <input type="submit" value="Upload Image">
+    </form>
+
+    <div id="image-container">
+        <img id="processed-image" src="" alt="Processed Image">
+        <p><a id="download-link" href="#" download>Download Processed Image</a></p>
+    </div>
+
+    <script>
+        // Handle image upload
+        document.getElementById('upload-image-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Image URL:", data.image_url); // Debug: Log image URL
+                const imageElement = document.getElementById('processed-image');
+                imageElement.src = data.image_url;
+                document.getElementById('image-container').style.display = 'block';
+
+                // Update download link
+                const downloadLink = document.getElementById('download-link');
+                downloadLink.href = `/static/${data.image_url.split('/').pop()}`;
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
