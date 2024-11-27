@@ -84,15 +84,28 @@ def upload_video_route():
     # Return the file path to be used in live streaming
     return jsonify({"success": True, "file_path": file_path})
 
-@app.route("/process_live_stream")
+@app.route("/process_live_stream", methods=["GET"])
 def process_live_stream():
     file_path = request.args.get('file')
     if not file_path:
         return "Error: No file path provided", 400
 
+    # Get parameters from the request
+    try:
+        iou_thr = float(request.args.get("iou_thr"))
+        skip_box_thr = float(request.args.get("skip_box_thr"))
+        p = float(request.args.get("p"))
+        max_age = int(request.args.get("max_age"))
+        n_init = int(request.args.get("n_init"))
+        max_cosine_distance = float(request.args.get("max_cosine_distance"))
+        nms_max_overlap = float(request.args.get("nms_max_overlap"))
+        frame_window = int(request.args.get("frame_window"))
+    except (KeyError, ValueError) as e:
+        return jsonify({"error": str(e)}), 400
+
     # Initialize DeepSORT and Voting System for live stream
-    tracker = DeepSort(max_age=5, nms_max_overlap=1.0, n_init=3, max_cosine_distance=0.2)
-    voting_system = VotingSystem(frame_window=3)
+    tracker = DeepSort(max_age=max_age, nms_max_overlap=nms_max_overlap, n_init=n_init, max_cosine_distance=max_cosine_distance)
+    voting_system = VotingSystem(frame_window=frame_window)
 
     def gen():
         cap = cv2.VideoCapture(file_path)
@@ -108,7 +121,7 @@ def process_live_stream():
 
             # Perform detection with YOLO
             img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            boxes, labels, scores = run_on_frame(models, img_array, "1_1.jpg", 0.7, 0.01, 0.01)
+            boxes, labels, scores = run_on_frame(models, img_array, "1_1.jpg", iou_thr, skip_box_thr, p)
             labels = [int(label) for label in labels]
 
             detections = []
@@ -178,11 +191,13 @@ def process_video():
         max_age = int(request.form["max_age"])
         n_init = int(request.form["n_init"])
         max_cosine_distance = float(request.form["max_cosine_distance"])
+        max_iou_distance=float(request.form["max_iou_distance"]),
+        nms_max_overlap=float(request.form["max_iou_distance"])
     except (KeyError, ValueError) as e:
         return jsonify({"error": str(e)}), 400
 
     # Initialize DeepSORT
-    tracker = DeepSort(max_age=max_age, nms_max_overlap=1, n_init=n_init, max_cosine_distance=max_cosine_distance, max_iou_distance=0.8, nn_budget=None, override_track_class=None)
+    tracker = DeepSort(max_age=max_age, nms_max_overlap=nms_max_overlap, n_init=n_init, max_cosine_distance=max_cosine_distance, max_iou_distance=max_iou_distance, nn_budget=None, override_track_class=None)
 
     # Open the video file
     cap = cv2.VideoCapture(file_path)

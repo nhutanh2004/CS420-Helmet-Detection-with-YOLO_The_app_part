@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Upload Video for Object Detection</title>
+    <title>Upload Video for Object Detection Live View</title>
     <style>
         #live-stream {
             display: none; /* Hide the live stream section initially */
@@ -14,7 +14,7 @@
     </style>
 </head>
 <body>
-    <h1>Upload a Video for Object Detection</h1>
+    <h1>Upload a Video for Object Detection Live View</h1>
     
     <!-- Form for video upload and parameters -->
     <form id="upload-video-form" action="/upload_video" method="post" enctype="multipart/form-data">
@@ -34,6 +34,8 @@
                 <input type="number" id="skip_box_thr" name="skip_box_thr" step="0.0001" min="0" max="1" value="0.0001" required>
                 <label for="p">Minimum Minority Threshold:</label>
                 <input type="number" id="p" name="p" step="0.0001" min="0" max="1" value="0.0001" required>
+                <label for="nms_max_overlap">Nms Max Overlap:</label>
+                <input type="number" id="nms_max_overlap" name="nms_max_overlap" step="0.01" min="0" max="1" value="1" required>
             </div>
             <!-- Third Row -->
             <div>
@@ -43,6 +45,8 @@
                 <input type="number" id="n_init" name="n_init" step="1" min="1" value="3" required>
                 <label for="max_cosine_distance">Max Cosine Distance:</label>
                 <input type="number" id="max_cosine_distance" name="max_cosine_distance" step="0.01" min="0" max="1" value="0.2" required>
+                <label for="max_iou_distance">Max IoU Distance:</label>
+                <input type="number" id="max_iou_distance" name="max_iou_distance" step="0.01" min="0" max="1" value="1" required>
             </div>
         </div>
     </form>
@@ -71,8 +75,21 @@
                     // Show the live stream section
                     const liveStreamContainer = document.getElementById('live-stream');
                     const liveStreamImg = document.getElementById('live-stream-img');
-                    
-                    liveStreamImg.src = "/process_live_stream?file=" + encodeURIComponent(data.file_path);
+
+                    // Build the query string with parameters
+                    const queryString = new URLSearchParams({
+                        file: data.file_path,
+                        iou_thr: document.getElementById('iou_thr').value,
+                        skip_box_thr: document.getElementById('skip_box_thr').value,
+                        p: document.getElementById('p').value,
+                        max_age: document.getElementById('max_age').value,
+                        n_init: document.getElementById('n_init').value,
+                        max_cosine_distance: document.getElementById('max_cosine_distance').value,
+                        nms_max_overlap: document.getElementById('nms_max_overlap').value,
+                        frame_window: document.getElementById('frame_window').value,
+                    });
+
+                    liveStreamImg.src = "/process_live_stream?" + queryString.toString();
                     liveStreamContainer.style.display = 'block';
                 } else {
                     alert('Error processing video');
@@ -83,6 +100,7 @@
             })
             .catch(error => {
                 console.error('Error:', error);
+
                 // Enable the submit button in case of error
                 submitButton.disabled = false;
             });
