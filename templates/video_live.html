@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Video for Object Detection</title>
+    <style>
+        #live-stream {
+            display: none; /* Hide the live stream section initially */
+        }
+
+        #live-stream img {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload a Video for Object Detection</h1>
+    
+    <!-- Form for video upload and parameters -->
+    <form id="upload-video-form" action="/upload_video" method="post" enctype="multipart/form-data">
+        <div style="display: flex; flex-direction: column;">
+            <!-- First Row -->
+            <div style="margin-bottom: 20px;">
+                <input type="file" name="file" accept="video/*" required>
+                <input type="submit" id="submit-button" value="Upload Video">
+                <label for="frame_window">Frame window for voting:</label>
+                <input type="number" id="frame_window" name="frame_window" step="1" min="2" max="10" value="3" required>
+            </div>
+            <!-- Second Row -->
+            <div style="margin-bottom: 20px;">
+                <label for="iou_thr">IoU Threshold:</label>
+                <input type="number" id="iou_thr" name="iou_thr" step="0.01" min="0" max="1" value="0.7" required>
+                <label for="skip_box_thr">Skip Box Threshold:</label>
+                <input type="number" id="skip_box_thr" name="skip_box_thr" step="0.0001" min="0" max="1" value="0.0001" required>
+                <label for="p">Minimum Minority Threshold:</label>
+                <input type="number" id="p" name="p" step="0.0001" min="0" max="1" value="0.0001" required>
+            </div>
+            <!-- Third Row -->
+            <div>
+                <label for="max_age">Max Age:</label>
+                <input type="number" id="max_age" name="max_age" step="1" min="1" value="30" required>
+                <label for="n_init">N Init:</label>
+                <input type="number" id="n_init" name="n_init" step="1" min="1" value="3" required>
+                <label for="max_cosine_distance">Max Cosine Distance:</label>
+                <input type="number" id="max_cosine_distance" name="max_cosine_distance" step="0.01" min="0" max="1" value="0.2" required>
+            </div>
+        </div>
+    </form>
+    
+    <div id="live-stream">
+        <img id="live-stream-img" src="" alt="Live Stream">
+    </div>
+
+    <script>
+        // Handle video upload and parameter submission
+        document.getElementById('upload-video-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            var submitButton = document.getElementById('submit-button');
+
+            // Disable the submit button
+            submitButton.disabled = true;
+
+            fetch('/upload_video', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show the live stream section
+                    const liveStreamContainer = document.getElementById('live-stream');
+                    const liveStreamImg = document.getElementById('live-stream-img');
+                    
+                    liveStreamImg.src = "/process_live_stream?file=" + encodeURIComponent(data.file_path);
+                    liveStreamContainer.style.display = 'block';
+                } else {
+                    alert('Error processing video');
+                }
+
+                // Enable the submit button
+                submitButton.disabled = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Enable the submit button in case of error
+                submitButton.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>

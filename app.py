@@ -1,8 +1,6 @@
-from flask import Flask, render_template, request, jsonify, send_file, send_from_directory
-from ultralytics import YOLO
-import os
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, Response
 import cv2
-import numpy as np
+import os
 from werkzeug.utils import secure_filename
 import subprocess
 import sys
@@ -11,28 +9,26 @@ sys.path.append("backend/source")
 
 from backend.source.test import run_on_frame, create_models
 from backend.source.utils.visualize import plot_bbox
-from deep_sort_realtime.deep_sort.tracker import Tracker
 from deep_sort_realtime.deepsort_tracker import DeepSort
-import logging
+# import logging
+from voting_system import VotingSystem
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Configure logging 
-# """ when using logging the server address will be inside the debug.txt"""
-# logging.basicConfig( 
-#     filename='debug.txt', 
-#     level=logging.DEBUG, 
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s' 
-#     )
+# Configure logging
+# logging.basicConfig(
+#     filename='debug.txt',
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# )
 
-# Ensure static directory exists
-if not os.path.exists("static"):
-    os.makedirs("static")
+# Ensure directories exist
+for directory in ["static", "weights", app.config['UPLOAD_FOLDER']]:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
-# Ensure weights directory exists
-if not os.path.exists("weights"):
-    os.makedirs("weights")
-# Ensure boxs don't go outside frame
+# Utility functions
 def clip_bbox(bbox, frame_width, frame_height):
     x1 = max(0, min(bbox[0], frame_width - 1))
     y1 = max(0, min(bbox[1], frame_height - 1))
@@ -50,7 +46,7 @@ def xyxy2ltwh(box):
     w, h = x2 - x1, y2 - y1
     return [x1, y1, w, h]
 
-# Create a list of model weights
+# Load model weights
 def get_model_weights():
     weights_dir = "weights"
     return [
@@ -63,9 +59,104 @@ def get_model_weights():
 model_weights_list = get_model_weights()
 models, model_names = create_models(model_weights_list)
 
-@app.route("/")
-def upload_video():
-    return render_template("video.html")
+@app.route("/") 
+def index(): 
+    return render_template("home.html") 
+@app.route("/video") 
+def video_page(): 
+    return render_template("video.html") 
+@app.route("/live_stream") 
+def live_stream_page(): 
+    return render_template("video_live.html")
+
+@app.route("/upload_video", methods=["POST"])
+def upload_video_route():
+    if "file" not in request.files:
+        return jsonify({"success": False, "error": "No file part"}), 400
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"success": False, "error": "No selected file"}), 400
+
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(file_path)
+
+    # Return the file path to be used in live streaming
+    return jsonify({"success": True, "file_path": file_path})
+
+@app.route("/process_live_stream")
+def process_live_stream():
+    file_path = request.args.get('file')
+    if not file_path:
+        return "Error: No file path provided", 400
+
+    # Initialize DeepSORT and Voting System for live stream
+    tracker = DeepSort(max_age=5, nms_max_overlap=1.0, n_init=3, max_cosine_distance=0.2)
+    voting_system = VotingSystem(frame_window=3)
+
+    def gen():
+        cap = cv2.VideoCapture(file_path)
+        if not cap.isOpened():
+            print("Error: Could not open video file.")
+            return
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                print("Error: Could not read frame.")
+                break
+
+            # Perform detection with YOLO
+            img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            boxes, labels, scores = run_on_frame(models, img_array, "1_1.jpg", 0.7, 0.01, 0.01)
+            labels = [int(label) for label in labels]
+
+            detections = []
+            for i in range(len(labels)):
+                if scores[i] > 0.001:
+                    boxes[i][0] = int(boxes[i][0] * frame.shape[1])
+                    boxes[i][1] = int(boxes[i][1] * frame.shape[0])
+                    boxes[i][2] = int(boxes[i][2] * frame.shape[1])
+                    boxes[i][3] = int(boxes[i][3] * frame.shape[0])
+                    boxes[i] = xyxy2ltwh(boxes[i])
+                    detections.append((boxes[i], scores[i], labels[i]))
+
+            # Update DeepSORT tracker with the latest detections
+            tracks = tracker.update_tracks(detections, frame=frame)
+
+            # Process each frame
+            for track in tracks:
+                if track.is_confirmed() and track.time_since_update <= 1:
+                    bbox = track.to_ltrb()
+                    bbox = clip_bbox(bbox, frame.shape[1], frame.shape[0])
+
+                    track_id = track.track_id
+                    det_label = track.get_det_class()
+                    det_score = track.get_det_conf()
+
+                    # Update the voting system with the latest detection data
+                    voting_system.update_track(track_id, det_label, det_score)
+
+                    # Get the voted label and average score
+                    voted_label, avg_score = voting_system.get_voted_label_and_score(track_id)
+
+                    # Draw the bounding box with the stored label and score
+                    frame = plot_bbox(frame, [bbox], [voted_label], [avg_score])
+
+            # Encode frame to JPEG format
+            ret, jpeg = cv2.imencode('.jpg', frame)
+            if not ret:
+                print("Error: Could not encode frame.")
+                continue
+
+            # Convert encoded frame to bytes and yield it in the response
+            frame_bytes = jpeg.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
+
+        cap.release()
+
+    return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route("/process_video", methods=["POST"])
 def process_video():
@@ -90,9 +181,9 @@ def process_video():
     except (KeyError, ValueError) as e:
         return jsonify({"error": str(e)}), 400
 
-
     # Initialize DeepSORT
-    tracker = DeepSort(max_age=max_age, nms_max_overlap=1, n_init=n_init, max_cosine_distance=max_cosine_distance, max_iou_distance=0.8, nn_budget=None, override_track_class=None)    
+    tracker = DeepSort(max_age=max_age, nms_max_overlap=1, n_init=n_init, max_cosine_distance=max_cosine_distance, max_iou_distance=0.8, nn_budget=None, override_track_class=None)
+
     # Open the video file
     cap = cv2.VideoCapture(file_path)
     if not cap.isOpened():
@@ -137,7 +228,7 @@ def process_video():
 
         detections = []
         if frame_counter % detection_interval == 0:
-            logging.info(f"frame_counter: {frame_counter}]")
+            #logging.info(f"frame_counter: {frame_counter}]")
             # Perform detection with YOLO
             img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             boxes, labels, scores = run_on_frame(models, img_array, "1_1.jpg", iou_thr, skip_box_thr, p)
@@ -151,14 +242,13 @@ def process_video():
                     boxes[i][3] = int(boxes[i][3] * target_height)
                     boxes[i] = xyxy2ltwh(boxes[i])
                     detections.append((boxes[i], scores[i], labels[i]))
-        for detection in detections:
-            logging.info(f"Yolo detection: {detection}")
+        # for detection in detections:
+        #     logging.info(f"Yolo detection: {detection}")
         # Update DeepSORT tracker with the latest detections
         tracks = tracker.update_tracks(detections, frame=frame)
-        for track in tracks:
-            logging.info(f"Deepsort ID,state,age: {track.track_id},{track.state},{track.age}")
-            logging.info(f"box,score,labels: {track.to_ltrb()},{track.get_det_conf()}, {track.get_det_class()}")
-
+        # for track in tracks:
+        #     logging.info(f"Deepsort ID,state,age: {track.track_id},{track.state},{track.age}")
+        #     logging.info(f"box,score,labels: {track.to_ltrb()},{track.get_det_conf()}, {track.get_det_class()}")
 
         # Process each frame
         for track in tracks:
@@ -167,19 +257,17 @@ def process_video():
                 bbox = clip_bbox(bbox, frame_width, frame_height)
 
                 track_id = track.track_id
-                
                 if track_id not in track_info:
                     # Store initial label and score
                     det_label = track.get_det_class()
                     det_score = track.get_det_conf()
-                    
                     track_info[track_id] = (det_label, det_score)
                 else:
                     # Use stored label and score
                     det_label, det_score = track_info[track_id]
 
                 # Log the details for each track
-                logging.info(f"draw id, box, labels, scores: {track_id}, {bbox}, {det_label}, {det_score}")
+                # logging.info(f"draw id, box, labels, scores: {track_id}, {bbox}, {det_label}, {det_score}")
 
                 # Draw the bounding box with the stored label and score
                 frame = plot_bbox(frame, [bbox], [det_label], [det_score])
@@ -224,26 +312,16 @@ def process_video():
             print(f"Compressed video created successfully at: {compressed_output_path}")
     except Exception as e:
         print(f"An error occurred: {e}")
+
     # Delete the intermediate processed video file
     if os.path.exists(output_path):
         os.remove(output_path)
 
-    # # Delete the original video file
-    # if os.path.exists(file_path):
-    #     os.remove(file_path)
-
-    return jsonify(
-        {
-            "original_video_url": f"/static/{filename}",
-            "processed_video_url": f"/{compressed_output_path}",
-        }
-    )
-
-
-@app.route("/download/<filename>", methods=["GET"])
-def download_file(filename):
-    return send_from_directory("static", filename, as_attachment=True)
-
+    # Return the URLs for the original and processed video
+    return jsonify({
+        "original_video_url": f"/static/{filename}",
+        "processed_video_url": f"/{compressed_output_path}",
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
