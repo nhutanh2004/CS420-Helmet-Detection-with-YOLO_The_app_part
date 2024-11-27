@@ -67,9 +67,11 @@ models, model_names = create_models(model_weights_list)
 
 # Initialize DeepSORT
 tracker = DeepSort(
-    max_age=5,
-    n_init=2,
-    max_cosine_distance=0.2,
+    max_age=10,
+    n_init=3,
+    max_cosine_distance=0.3,
+    max_iou_distance=0.8,
+    nms_max_overlap=0.8,
 )
 
 
@@ -110,7 +112,7 @@ def process_video():
 
     frame_interval = frame_rate // target_fps  # Interval to skip frames
 
-    target_width = 1280
+    target_width = 640
     aspect_ratio = frame_height / frame_width
     target_height = int(target_width * aspect_ratio)
 
@@ -174,17 +176,14 @@ def process_video():
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
 
-            if track.get_det_conf() is None:
+            # filter out None values of confs
+            if track.get_det_conf() is None or track.get_det_conf() < p:
                 continue
 
             ltrb_box = track.to_ltrb()
             deep_sort_boxes.append(ltrb_box)
             deep_sort_labels.append(track.get_det_class())
             deep_sort_scores.append(track.get_det_conf())
-
-        # deep_sort_scores = [
-        #     float(score) if score is not None else -1.0 for score in deep_sort_scores
-        # ]
 
         print(
             f"deep_sort_boxes: {len(deep_sort_boxes)}, {len(deep_sort_labels)}, {len(deep_sort_scores)}"
