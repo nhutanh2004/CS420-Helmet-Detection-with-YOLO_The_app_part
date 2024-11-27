@@ -11,9 +11,19 @@ sys.path.append("backend/source")
 
 from backend.source.test import run_on_frame, create_models
 from backend.source.utils.visualize import plot_bbox
+from deep_sort_realtime.deep_sort.tracker import Tracker
 from deep_sort_realtime.deepsort_tracker import DeepSort
+import logging
 
 app = Flask(__name__)
+
+# Configure logging 
+# """ when using logging the server address will be inside the debug.txt"""
+# logging.basicConfig( 
+#     filename='debug.txt', 
+#     level=logging.DEBUG, 
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s' 
+#     )
 
 # Ensure static directory exists
 if not os.path.exists("static"):
@@ -29,6 +39,17 @@ def clip_bbox(bbox, frame_width, frame_height):
     x2 = max(0, min(bbox[2], frame_width - 1))
     y2 = max(0, min(bbox[3], frame_height - 1))
     return [x1, y1, x2, y2]
+
+def ltwh2xyxy(box):
+    x1, y1, w, h = box
+    x2, y2 = x1 + w, y1 + h
+    return [x1, y1, x2, y2]
+
+def xyxy2ltwh(box):
+    x1, y1, x2, y2 = box
+    w, h = x2 - x1, y2 - y1
+    return [x1, y1, w, h]
+
 # Create a list of model weights
 def get_model_weights():
     weights_dir = "weights"
@@ -42,33 +63,6 @@ def get_model_weights():
 model_weights_list = get_model_weights()
 models, model_names = create_models(model_weights_list)
 
-# Define class names
-class_names = [
-    "motorbike",
-    "DHelmet",
-    "DNoHelmet",
-    "P1Helmet",
-    "P1NoHelmet",
-    "P2Helmet",
-    "P2NoHelmet",
-    "P0Helmet",
-    "P0NoHelmet",
-]
-class_colors = [
-    (255, 0, 0),
-    (0, 255, 0),
-    (0, 0, 255),
-    (255, 255, 0),
-    (0, 255, 255),
-    (255, 0, 255),
-    (128, 0, 0),
-    (0, 128, 0),
-    (0, 0, 128),
-]
-
-# Initialize DeepSORT
-tracker = DeepSort(max_age=30, n_init=2, max_cosine_distance=0.1, nn_budget=None, override_track_class=None)
-
 @app.route("/")
 def upload_video():
     return render_template("video.html")
@@ -76,19 +70,29 @@ def upload_video():
 @app.route("/process_video", methods=["POST"])
 def process_video():
     if "file" not in request.files:
-        return jsonify({"error": "No file part"})
+        return jsonify({"error": "No file part"}), 400
     file = request.files["file"]
     if file.filename == "":
-        return jsonify({"error": "No selected file"})
+        return jsonify({"error": "No selected file"}), 400
+
     filename = secure_filename(file.filename)
     file_path = os.path.join("static", filename)
     file.save(file_path)
 
     # Get parameters from the request
-    iou_thr = float(request.form["iou_thr"])
-    skip_box_thr = float(request.form["skip_box_thr"])
-    p = float(request.form["p"])
+    try:
+        iou_thr = float(request.form["iou_thr"])
+        skip_box_thr = float(request.form["skip_box_thr"])
+        p = float(request.form["p"])
+        max_age = int(request.form["max_age"])
+        n_init = int(request.form["n_init"])
+        max_cosine_distance = float(request.form["max_cosine_distance"])
+    except (KeyError, ValueError) as e:
+        return jsonify({"error": str(e)}), 400
 
+
+    # Initialize DeepSORT
+    tracker = DeepSort(max_age=max_age, nms_max_overlap=1, n_init=n_init, max_cosine_distance=max_cosine_distance, max_iou_distance=0.8, nn_budget=None, override_track_class=None)    
     # Open the video file
     cap = cv2.VideoCapture(file_path)
     if not cap.isOpened():
@@ -98,7 +102,7 @@ def process_video():
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
-    target_fps = 10  # Desired frames per second for processing
+    target_fps = 30  # Desired frames per second for processing
 
     if target_fps > frame_rate:
         target_fps = frame_rate
@@ -133,6 +137,7 @@ def process_video():
 
         detections = []
         if frame_counter % detection_interval == 0:
+            logging.info(f"frame_counter: {frame_counter}]")
             # Perform detection with YOLO
             img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             boxes, labels, scores = run_on_frame(models, img_array, "1_1.jpg", iou_thr, skip_box_thr, p)
@@ -140,33 +145,44 @@ def process_video():
 
             for i in range(len(labels)):
                 if scores[i] > 0.001:
-                    box = [
-                        int(boxes[i][0] * target_width),
-                        int(boxes[i][1] * target_height),
-                        int((boxes[i][2]-boxes[i][0]) * target_width),
-                        int((boxes[i][3]-boxes[i][1]) * target_height)
-                    ]
-                    detections.append((box, scores[i], labels[i]))
-
+                    boxes[i][0] = int(boxes[i][0] * target_width)
+                    boxes[i][1] = int(boxes[i][1] * target_height)
+                    boxes[i][2] = int(boxes[i][2] * target_width)
+                    boxes[i][3] = int(boxes[i][3] * target_height)
+                    boxes[i] = xyxy2ltwh(boxes[i])
+                    detections.append((boxes[i], scores[i], labels[i]))
+        for detection in detections:
+            logging.info(f"Yolo detection: {detection}")
         # Update DeepSORT tracker with the latest detections
         tracks = tracker.update_tracks(detections, frame=frame)
+        for track in tracks:
+            logging.info(f"Deepsort ID,state,age: {track.track_id},{track.state},{track.age}")
+            logging.info(f"box,score,labels: {track.to_ltrb()},{track.get_det_conf()}, {track.get_det_class()}")
+
 
         # Process each frame
         for track in tracks:
             if track.is_confirmed() and track.time_since_update <= 1:
-                bbox = track.to_tlbr()
+                bbox = track.to_ltrb()
                 bbox = clip_bbox(bbox, frame_width, frame_height)
 
                 track_id = track.track_id
+                
                 if track_id not in track_info:
-                    for det in detections:
-                        box, det_score, det_label = det
-                        track_info[track_id] = (det_label, det_score)
-                        break
+                    # Store initial label and score
+                    det_label = track.get_det_class()
+                    det_score = track.get_det_conf()
+                    
+                    track_info[track_id] = (det_label, det_score)
                 else:
+                    # Use stored label and score
                     det_label, det_score = track_info[track_id]
 
-                frame = plot_bbox( frame, [bbox], [det_label], [det_score], names=class_names, class_colors=class_colors )
+                # Log the details for each track
+                logging.info(f"draw id, box, labels, scores: {track_id}, {bbox}, {det_label}, {det_score}")
+
+                # Draw the bounding box with the stored label and score
+                frame = plot_bbox(frame, [bbox], [det_label], [det_score])
 
         output.write(frame)  # Write the processed frame to the output video
         frame_counter += 1  # Increment frame counter
