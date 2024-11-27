@@ -67,11 +67,9 @@ models, model_names = create_models(model_weights_list)
 
 # Initialize DeepSORT
 tracker = DeepSort(
-    max_age=30,
+    max_age=5,
     n_init=2,
-    max_cosine_distance=0.1,
-    nn_budget=None,
-    override_track_class=None,
+    max_cosine_distance=0.2,
 )
 
 
@@ -105,14 +103,14 @@ def process_video():
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
-    target_fps = 15  # Desired frames per second for processing
+    target_fps = 12  # Desired frames per second for processing
 
     if target_fps > frame_rate:
         target_fps = frame_rate
 
     frame_interval = frame_rate // target_fps  # Interval to skip frames
 
-    target_width = 1920
+    target_width = 1280
     aspect_ratio = frame_height / frame_width
     target_height = int(target_width * aspect_ratio)
 
@@ -173,20 +171,20 @@ def process_video():
         deep_sort_scores = []
 
         for track in tracks:
-            # if not track.is_confirmed() :
-            #     continue
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
-            track_id = track.track_id
-            ltrb_box = track.to_ltrb()
 
+            if track.get_det_conf() is None:
+                continue
+
+            ltrb_box = track.to_ltrb()
             deep_sort_boxes.append(ltrb_box)
             deep_sort_labels.append(track.get_det_class())
             deep_sort_scores.append(track.get_det_conf())
 
-        deep_sort_scores = [
-            float(score) if score is not None else 0.0 for score in deep_sort_scores
-        ]
+        # deep_sort_scores = [
+        #     float(score) if score is not None else -1.0 for score in deep_sort_scores
+        # ]
 
         print(
             f"deep_sort_boxes: {len(deep_sort_boxes)}, {len(deep_sort_labels)}, {len(deep_sort_scores)}"
