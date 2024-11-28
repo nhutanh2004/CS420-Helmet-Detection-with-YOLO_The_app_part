@@ -67,11 +67,11 @@ models, model_names = create_models(model_weights_list)
 
 # Initialize DeepSORT
 tracker = DeepSort(
-    max_age=10,
+    max_age=20,
     n_init=3,
     max_cosine_distance=0.3,
     max_iou_distance=0.8,
-    nms_max_overlap=0.8,
+    nms_max_overlap=0.7,
 )
 
 
@@ -125,6 +125,9 @@ def process_video():
     frame_counter = 0  # Initialize frame counter
     detection_interval = 1  # Detect every frame
 
+    # trick from nahrixt.py
+    tracking = {}
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -152,6 +155,7 @@ def process_video():
         # Truncate virtual boxes and denormalize real boxes
         detections = []
         for i in range(len(labels)):
+
             # Denormalize the boxes
             boxes[i][0] = int(boxes[i][0] * target_width)
             boxes[i][1] = int(boxes[i][1] * target_height)
@@ -171,18 +175,30 @@ def process_video():
         deep_sort_boxes = []
         deep_sort_labels = []
         deep_sort_scores = []
+        track_ids = []
 
         for track in tracks:
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue
 
             # filter out None values of confs
-            if track.get_det_conf() is None or track.get_det_conf() < p:
+            if track.get_det_conf() is None:
                 continue
 
+            track_id = track.track_id
+            track_class = track.get_det_class()
+            track_conf = track.get_det_conf()
+
+            if track_id not in tracking:
+                tracking[track_id] = []
+                tracking[track_id].append(track_class)
+            else:
+                track_class = tracking[track_id][0]
+
             ltrb_box = track.to_ltrb()
+            track_ids.append(track.track_id)
             deep_sort_boxes.append(ltrb_box)
-            deep_sort_labels.append(track.get_det_class())
+            deep_sort_labels.append(track_class)
             deep_sort_scores.append(track.get_det_conf())
 
         print(
@@ -193,12 +209,24 @@ def process_video():
 
         # Draw bounding boxes on the frame
         drew_frame = plot_bbox(
-            frame, deep_sort_boxes, deep_sort_labels, deep_sort_scores
+            frame,
+            deep_sort_boxes,
+            deep_sort_labels,
+            deep_sort_scores,
+            track_ids,
         )
 
         # Write the processed frame to the output video
         output.write(drew_frame)
         frame_counter += 1  # Increment frame counter
+
+        # Show hình ảnh lên màn hình
+        resize_frame = cv2.resize(drew_frame, (960, 720))
+        cv2.imshow("OT", resize_frame)
+        cv2.waitKey(3)
+        # Bấm Q thì thoát
+        if cv2.waitKey(1) == ord("q"):
+            break
 
     cap.release()
     output.release()
