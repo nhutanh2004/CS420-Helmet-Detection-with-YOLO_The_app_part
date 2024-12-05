@@ -69,7 +69,7 @@ models, model_names = create_models(model_weights_list)
 tracker = DeepSort(
     max_age=20,
     n_init=3,
-    max_cosine_distance=0.3,
+    max_cosine_distance=0.35,
     max_iou_distance=0.8,
     nms_max_overlap=0.7,
 )
@@ -105,14 +105,14 @@ def process_video():
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
-    target_fps = 12  # Desired frames per second for processing
+    target_fps = 20  # Desired frames per second for processing
 
     if target_fps > frame_rate:
         target_fps = frame_rate
 
     frame_interval = frame_rate // target_fps  # Interval to skip frames
 
-    target_width = 640
+    target_width = 1080
     aspect_ratio = frame_height / frame_width
     target_height = int(target_width * aspect_ratio)
 
@@ -123,10 +123,10 @@ def process_video():
     )
 
     frame_counter = 0  # Initialize frame counter
-    detection_interval = 1  # Detect every frame
 
     # trick from nahrixt.py
     tracking = {}
+    detection_interval = 1
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -134,44 +134,47 @@ def process_video():
             break
 
         # Skip frames to meet the target FPS
-        if frame_counter % frame_interval != 0:
-            frame_counter += 1
-            continue
+        # if frame_counter % frame_interval != 0:
+        #     frame_counter += 1
+        #     continue
 
         # Resize frame to the target size
         frame = cv2.resize(frame, (target_width, target_height))
 
-        # Convert the frame to RGB
-        img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # Skip detection for some frames
+        if frame_counter % detection_interval == 0 or frame_counter <= 5:
 
-        # Run the models on the frame (bbox is in xyxy format)
-        boxes, labels, scores = run_on_frame(
-            models, img_array, "1_1.jpg", iou_thr, skip_box_thr, p
-        )
+            # Convert the frame to RGB
+            img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Convert the labels to integers
-        labels = [int(label) for label in labels]
+            # Run the models on the frame (bbox is in xyxy format)
+            boxes, labels, scores = run_on_frame(
+                models, img_array, "1_1.jpg", iou_thr, skip_box_thr, p
+            )
+            # Convert the labels to integers
+            labels = [int(label) for label in labels]
+            # Truncate virtual boxes and denormalize real boxes
+            detections = []
+            for i in range(len(labels)):
+                if scores[i] < 0.25:
+                    continue
+                # Denormalize the boxes
+                boxes[i][0] = int(boxes[i][0] * target_width)
+                boxes[i][1] = int(boxes[i][1] * target_height)
+                boxes[i][2] = int(boxes[i][2] * target_width)
+                boxes[i][3] = int(boxes[i][3] * target_height)
+                # Clip the boxes to the frame
+                boxes[i] = clip_bbox(boxes[i], target_width, target_height)
+                # Convert xyxy to ltwh
+                boxes[i] = xyxy2ltwh(boxes[i])
+                detections.append((boxes[i], scores[i], labels[i]))
+            # Update tracker
+            tracks = tracker.update_tracks(detections, frame=frame)
+        else:
+            tracks = tracker.update_tracks([], frame=frame)
+            if len(tracks) == 0:
+                print("\tNo tracks found")
 
-        # Truncate virtual boxes and denormalize real boxes
-        detections = []
-        for i in range(len(labels)):
-
-            # Denormalize the boxes
-            boxes[i][0] = int(boxes[i][0] * target_width)
-            boxes[i][1] = int(boxes[i][1] * target_height)
-            boxes[i][2] = int(boxes[i][2] * target_width)
-            boxes[i][3] = int(boxes[i][3] * target_height)
-
-            # Clip the boxes to the frame
-            boxes[i] = clip_bbox(boxes[i], target_width, target_height)
-
-            # Convert xyxy to ltwh
-            boxes[i] = xyxy2ltwh(boxes[i])
-
-            detections.append((boxes[i], scores[i], labels[i]))
-
-        # Update tracker
-        tracks = tracker.update_tracks(detections, frame=frame)
         deep_sort_boxes = []
         deep_sort_labels = []
         deep_sort_scores = []
@@ -179,6 +182,7 @@ def process_video():
 
         for track in tracks:
             if not track.is_confirmed() or track.time_since_update > 1:
+                tracking.pop(track.track_id, None)
                 continue
 
             # filter out None values of confs
@@ -192,7 +196,11 @@ def process_video():
             if track_id not in tracking:
                 tracking[track_id] = []
                 tracking[track_id].append(track_class)
+                tracking[track_id].append(track_conf)
             else:
+                # if tracking[track_id][1] < track_conf:
+                #     tracking[track_id][0] = track_class
+                #     tracking[track_id][1] = track_conf
                 track_class = tracking[track_id][0]
 
             ltrb_box = track.to_ltrb()

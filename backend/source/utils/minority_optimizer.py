@@ -29,17 +29,24 @@ def minority(p, results, n=9):
     # classes_count, n_max_class = find_max(results)
 
     # MO on training set
-    with open("backend/source/utils/class_counts.json", "r") as f:
-        file = json.load(f)
-
-    classes_count = file["class_counts"]
+    classes_count = [
+        27337,
+        20894,
+        5327,
+        80,
+        3729,
+        0,
+        68,
+        1,
+        40,
+    ]  # count of samples per class on training set
     n_max_class = 0
     for item in classes_count:
         if item > n_max_class:
             n_max_class = item
     mean_samples = float(sum(classes_count) / n)  # mean samples per class
-    alpha = float(
-        n_max_class / mean_samples
+    alpha = (
+        float(n_max_class / mean_samples) if mean_samples != 0 else 0
     )  # mean samples per class / max samples in a class
 
     # print(f"\n\tclasses count : {classes_count}")
