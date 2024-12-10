@@ -1,2 +1,4 @@
+/static/*
+!static/styles.css
 /__pycache__/*
 /debug.txt
