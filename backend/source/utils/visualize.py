@@ -43,7 +43,13 @@ def get_optimal_font_scale(text, width, thickness=1):
 
 
 def plot_bbox(
-    image, boxes, labels, scores, names=class_names, class_colors=class_colors
+    image,
+    boxes,
+    labels,
+    scores,
+    track_ids,
+    names=class_names,
+    class_colors=class_colors,
 ):
     """
     Draw bounding boxes with labels and scores on the image.
@@ -66,7 +72,8 @@ def plot_bbox(
         color = class_colors[int(label)]
 
         # Create label text (class name and score)
-        label_text = f"{names[label]}:{score*100:.0f}"
+        label_text = f"{names[label]}:{score*100:.0f} - {track_ids[i]}"
+        # label_text = f"{names[label]}:{track_ids[i]}"
         max_width = 65 if x2 - x1 < 50 else x2 - x1
         max_width = min(max_width, 180)
         box_thickness = 1 if x2 - x1 < 100 else 2
