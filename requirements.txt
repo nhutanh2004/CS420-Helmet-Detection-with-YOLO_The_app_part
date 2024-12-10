@@ -1,6 +1,6 @@
 Flask==2.0.1
 ultralytics==8.0.2  # Adjust the version according to your specific needs
-opencv-python-headless==4.5.3.56
+opencv-python==4.5.3.56
 numpy==1.21.1
 Pillow==8.2.0
 torch==1.9.0  # Adjust the version according to your specific needs
