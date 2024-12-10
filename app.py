@@ -4,7 +4,7 @@ import os
 from werkzeug.utils import secure_filename
 import subprocess
 import sys
-from moviepy.edior import VideoFileClip
+from moviepy import VideoFileClip
 
 sys.path.append("backend/source")
 
@@ -369,4 +369,4 @@ def process_video():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port = 5000)
