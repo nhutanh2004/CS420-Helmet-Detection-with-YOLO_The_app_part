@@ -4,7 +4,7 @@ import os
 from werkzeug.utils import secure_filename
 import subprocess
 import sys
-from moviepy import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 
 sys.path.append("backend/source")
 
