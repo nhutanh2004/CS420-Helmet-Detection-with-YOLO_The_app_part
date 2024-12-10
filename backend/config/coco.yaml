@@ -1,0 +1,15 @@
+train: "../data/train/images" # Đường dẫn đến thư mục chứa ảnh huấn luyện
+val: "../data/val/images" # Đường dẫn đến thư mục chứa ảnh validation
+
+nc: 9 # Số lượng class
+names: [
+    "motorbike", #0
+    "DHelmet",   #1
+    "DNoHelmet", #2
+    "P1Helmet", #3 
+    "P1NoHelmet", #4
+    "P2Helmet",   #5
+    "P2NoHelmet", #6
+    "P0Helmet",  #7
+    "P0NoHelmet", #8
+  ] # Danh sách tên class
