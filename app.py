@@ -4,6 +4,7 @@ import os
 from werkzeug.utils import secure_filename
 import subprocess
 import sys
+from moviepy import VideoFileClip
 
 sys.path.append("backend/source")
 
@@ -298,7 +299,7 @@ def process_video():
                 track_id = track.track_id
                 track_class = track.get_det_class()
                 track_conf = track.get_det_conf()
-                voting_system.update_track(track_id,track_class,track_conf)
+                voting_system.update_track(track_id, track_class, track_conf)
 
             # filter out None values of confs
                 
@@ -326,7 +327,10 @@ def process_video():
     cap.release()
     output.release()
 
-    # Compress the video using ffmpeg command line and capture stderr
+    # Ensure the output file is properly closed
+    output.release()
+
+    # Convert and compress the video using MoviePy
     counter = 0
     compressed_output_path = os.path.join(
         "static", f"{filename.split('.')[0]}.mp4"
@@ -337,33 +341,25 @@ def process_video():
             "static", f"{filename.split('.')[0]}_{counter}.mp4"
         )
 
-    ffmpeg_cmd = [
-        "./ffmpeg.exe",
-        "-i",
-        output_path,
-        "-vcodec",
-        "h264",
-        "-acodec",
-        "aac",
-        "-strict",
-        "-2",
-        compressed_output_path,
-    ]
-    # Debug for some time the compressed output does not save properly
     try:
-        result = subprocess.run(
-            ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        # Load the video
+        clip = VideoFileClip(output_path)
+        
+        # Write the video to a new file with compression settings
+        clip.write_videofile(
+            compressed_output_path,
+            codec='libx264',
+            audio_codec='aac',
+            temp_audiofile='temp-audio.m4a',
+            remove_temp=True
         )
-        if result.returncode != 0:
-            print(f"ffmpeg error: {result.stderr}")
-        else:
-            print(f"Compressed video created successfully at: {compressed_output_path}")
+        print(f"Compressed video created successfully at: {compressed_output_path}")
     except Exception as e:
         print(f"An error occurred: {e}")
 
-    # Delete the intermediate processed video file
-    if os.path.exists(output_path):
-        os.remove(output_path)
+    # # Delete the intermediate processed video file
+    # if os.path.exists(output_path):
+    #     os.remove(output_path)
 
     # Return the URLs for the original and processed video
     return jsonify({
