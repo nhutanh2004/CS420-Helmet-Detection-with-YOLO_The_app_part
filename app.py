@@ -19,8 +19,8 @@ sys.path.append("backend/source")
 from backend.source.test import run_on_frame, create_models
 from backend.source.utils.visualize import plot_bbox
 
-from deep_sort_realtime.deep_sort_realtime.deepsort_tracker import DeepSort
-from deep_sort_realtime import deep_sort_realtime
+from deep_sort_.deep_sort_realtime.deepsort_tracker import DeepSort
+from deep_sort_ import deep_sort_realtime
 
 
 app = Flask(__name__)

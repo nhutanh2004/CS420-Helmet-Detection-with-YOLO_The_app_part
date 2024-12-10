@@ -10,12 +10,14 @@ def count_samples_per_class(data):
         class_id = int(line[8])
         class_counts[class_id] += 1
 
-    return class_counts, max(class_counts)
+    return class_counts
 
 
 def find_max(results):
-    classes_count, n_max_class = count_samples_per_class(results)
-    return classes_count, n_max_class
+    classes_count = count_samples_per_class(results)
+    max_class = max(classes_count)
+
+    return classes_count, max_class
 
 
 def minority(p, results, n=9):
@@ -26,37 +28,43 @@ def minority(p, results, n=9):
     @param n: number of classes (=9)
     """
     # MO on frame
-    # classes_count, n_max_class = find_max(results)
+    classes_count, n_max_class = find_max(results)
 
     # MO on training set
-    classes_count = [
-        27337,
-        20894,
-        5327,
-        80,
-        3729,
-        0,
-        68,
-        1,
-        40,
-    ]  # count of samples per class on training set
-    n_max_class = 0
-    for item in classes_count:
-        if item > n_max_class:
-            n_max_class = item
-    mean_samples = float(sum(classes_count) / n)  # mean samples per class
-    alpha = (
-        float(n_max_class / mean_samples) if mean_samples != 0 else 0
-    )  # mean samples per class / max samples in a class
+    # classes_count = [
+    #     27337,
+    #     20894,
+    #     5327,
+    #     80,
+    #     3729,
+    #     0,
+    #     68,
+    #     1,
+    #     40,
+    # ]  # count of samples per class on training set
+    # n_max_class = 0
+    # for item in classes_count:
+    #     if item > n_max_class:
+    #         n_max_class = item
+
+    # mean_samples = float(sum(classes_count) / n)  # mean samples per class
+    
+    # alpha = (
+    #     float(n_max_class / mean_samples) if mean_samples != 0 else 0
+    # )  # mean samples per class / max samples in a class
+
+    mean_samples = float(len(results) / n)
+    alpha = mean_samples / n_max_class
 
     # print(f"\n\tclasses count : {classes_count}")
 
-    rare_classes = set()
+    rare_classes = []
 
     # find rare classes
     for index, each_class in enumerate(classes_count):
         if each_class < (n_max_class * alpha):
-            rare_classes.add(index)
+            # rare_classes.add(index)
+            rare_classes.append(index)
 
     min_thresh = 1
 
