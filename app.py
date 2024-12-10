@@ -354,12 +354,13 @@ def process_video():
             remove_temp=True
         )
         print(f"Compressed video created successfully at: {compressed_output_path}")
+        clip.close()
     except Exception as e:
         print(f"An error occurred: {e}")
 
-    # # Delete the intermediate processed video file
-    # if os.path.exists(output_path):
-    #     os.remove(output_path)
+    # Delete the intermediate processed video file
+    if os.path.exists(output_path):
+        os.remove(output_path)
 
     # Return the URLs for the original and processed video
     return jsonify({
