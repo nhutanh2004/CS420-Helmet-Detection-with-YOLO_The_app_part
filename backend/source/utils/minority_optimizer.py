@@ -103,8 +103,7 @@ def minority_optimizer_func(results, p=0.001):
             if result[-1] >= minority_score:
                 new_results.append(result)
         else:
-            if result[-1] >= 0.25:
-                new_results.append(result)
+            new_results.append(result)
 
     # results[i] = [video_id, frame_id, x1, y1, x2, y2, img_w, img_h, label, score]
     return new_results
