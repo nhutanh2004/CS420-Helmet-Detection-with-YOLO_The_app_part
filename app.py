@@ -103,6 +103,8 @@ if uploaded_file:
 
             detections = []
             for i in range(len(labels)):
+                if scores[i] < 0.25:
+                  continue
                 boxes[i][0] = int(boxes[i][0] * target_width)
                 boxes[i][1] = int(boxes[i][1] * target_height)
                 boxes[i][2] = int(boxes[i][2] * target_width)
