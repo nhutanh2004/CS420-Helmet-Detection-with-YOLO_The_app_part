@@ -57,7 +57,7 @@ def get_model_weights():
 # Create models using the provided weights
 model_weights_list = get_model_weights()
 models, model_names = create_models(model_weights_list)
-voting_system = VotingSystem(frame_window=10)
+
 @app.route("/") 
 def index(): 
     return render_template("home.html") 
@@ -125,36 +125,49 @@ def process_live_stream():
 
             detections = []
             for i in range(len(labels)):
-                if scores[i] > 0.001:
-                    boxes[i][0] = int(boxes[i][0] * frame.shape[1])
-                    boxes[i][1] = int(boxes[i][1] * frame.shape[0])
-                    boxes[i][2] = int(boxes[i][2] * frame.shape[1])
-                    boxes[i][3] = int(boxes[i][3] * frame.shape[0])
-                    boxes[i] = xyxy2ltwh(boxes[i])
-                    detections.append((boxes[i], scores[i], labels[i]))
+                if scores[i] < 0.15:
+                    continue
+                boxes[i][0] = int(boxes[i][0] * frame.shape[1])
+                boxes[i][1] = int(boxes[i][1] * frame.shape[0])
+                boxes[i][2] = int(boxes[i][2] * frame.shape[1])
+                boxes[i][3] = int(boxes[i][3] * frame.shape[0])
+                boxes[i] = clip_bbox(boxes[i], frame.shape[1], frame.shape[0])
+                boxes[i] = xyxy2ltwh(boxes[i])
+                detections.append((boxes[i], scores[i], labels[i]))
 
             # Update DeepSORT tracker with the latest detections
             tracks = tracker.update_tracks(detections, frame=frame)
 
-            # Process each frame
+            deep_sort_boxes = []
+            deep_sort_labels = []
+            deep_sort_scores = []
+            track_ids = []
+
             for track in tracks:
-                if track.is_confirmed() and track.time_since_update <= 1:
-                    bbox = track.to_ltrb()
-                    bbox = clip_bbox(bbox, frame.shape[1], frame.shape[0])
-
+                if track.is_confirmed() or track.time_since_update <= 1:
+                    if track.get_det_conf() is None:
+                        continue     
                     track_id = track.track_id
-                    det_label = track.get_det_class()
-                    det_score = track.get_det_conf()
+                    track_class = track.get_det_class()
+                    track_conf = track.get_det_conf()
+                    voting_system.update_track(track_id,track_class,track_conf)
 
-                    # Update the voting system with the latest detection data
-                    voting_system.update_track(track_id, det_label, det_score)
-
-                    # Get the voted label and average score
-                    voted_label, avg_score = voting_system.get_voted_label_and_score(track_id)
-
-                    # Draw the bounding box with the stored label and score
-                    frame = plot_bbox(frame, [bbox], [voted_label], [avg_score])
-
+                # filter out None values of confs
+                    
+                vote_class, avg_score = voting_system.get_voted_label_and_score(track_id)
+                ltrb_box = track.to_ltrb()
+                track_ids.append(track.track_id)
+                deep_sort_boxes.append(ltrb_box)
+                deep_sort_labels.append(vote_class)
+                deep_sort_scores.append(avg_score)
+            # Draw bounding boxes on the frame
+            drew_frame = plot_bbox(
+            frame,
+            deep_sort_boxes,
+            deep_sort_labels,
+            deep_sort_scores,
+            track_ids,
+            )
             # Encode frame to JPEG format
             ret, jpeg = cv2.imencode('.jpg', frame)
             if not ret:
@@ -198,7 +211,7 @@ def process_video():
 
     # Initialize DeepSORT
     tracker = DeepSort(max_age=max_age, nms_max_overlap=nms_max_overlap, n_init=n_init, max_cosine_distance=max_cosine_distance, max_iou_distance=max_iou_distance, nn_budget=None, override_track_class=None)
-
+    voting_system = VotingSystem(frame_window=10)
     # Open the video file
     cap = cv2.VideoCapture(file_path)
     if not cap.isOpened():
@@ -215,7 +228,7 @@ def process_video():
 
     frame_interval = frame_rate // target_fps  # Interval to skip frames
 
-    target_width = 640
+    target_width = 1080
     aspect_ratio = frame_height / frame_width
     target_height = int(target_width * aspect_ratio)
 
@@ -226,57 +239,89 @@ def process_video():
     frame_counter = 0  # Initialize frame counter
     detection_interval = 1  # Detect every frame
 
-    track_info = {}  # Initialize track info dictionary
-
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
 
         # Skip frames to meet the target FPS
-        if frame_counter % frame_interval != 0:
-            frame_counter += 1
-            continue
+        # if frame_counter % frame_interval != 0:
+        #     frame_counter += 1
+        #     continue
 
         # Resize frame to the target size
         frame = cv2.resize(frame, (target_width, target_height))
 
-        detections = []
-        if frame_counter % detection_interval == 0:
-            # Perform detection with YOLO
+        # Skip detection for some frames
+        if frame_counter % detection_interval == 0 or frame_counter <= 5:
+
+            # Convert the frame to RGB
             img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            boxes, labels, scores = run_on_frame(models, img_array, "1_1.jpg", iou_thr, skip_box_thr, p)
+
+            # Run the models on the frame (bbox is in xyxy format)
+            boxes, labels, scores = run_on_frame(
+                models, img_array, "1_1.jpg", iou_thr, skip_box_thr, p
+            )
+            # Convert the labels to integers
             labels = [int(label) for label in labels]
-
+            # Truncate virtual boxes and denormalize real boxes
+            detections = []
             for i in range(len(labels)):
-                if scores[i] > 0.001:
-                    boxes[i][0] = int(boxes[i][0] * target_width)
-                    boxes[i][1] = int(boxes[i][1] * target_height)
-                    boxes[i][2] = int(boxes[i][2] * target_width)
-                    boxes[i][3] = int(boxes[i][3] * target_height)
-                    boxes[i] = xyxy2ltwh(boxes[i])
-                    detections.append((boxes[i], scores[i], labels[i]))
-                    # Update VotingSystem
-                    voting_system.update_track(i, labels[i], scores[i])
+                if scores[i] < 0.25:
+                    continue
+                # Denormalize the boxes
+                boxes[i][0] = int(boxes[i][0] * target_width)
+                boxes[i][1] = int(boxes[i][1] * target_height)
+                boxes[i][2] = int(boxes[i][2] * target_width)
+                boxes[i][3] = int(boxes[i][3] * target_height)
+                # Clip the boxes to the frame
+                boxes[i] = clip_bbox(boxes[i], target_width, target_height)
+                # Convert xyxy to ltwh
+                boxes[i] = xyxy2ltwh(boxes[i])
+                detections.append((boxes[i], scores[i], labels[i]))
+            # Update tracker
+            tracks = tracker.update_tracks(detections, frame=frame)
+        else:
+            tracks = tracker.update_tracks([], frame=frame)
+            if len(tracks) == 0:
+                print("\tNo tracks found")
 
-        # Update DeepSORT tracker with the latest detections
-        tracks = tracker.update_tracks(detections, frame=frame)
+        deep_sort_boxes = []
+        deep_sort_labels = []
+        deep_sort_scores = []
+        track_ids = []
 
-        # Process each frame
         for track in tracks:
-            if track.is_confirmed() and track.time_since_update <= 1:
-                bbox = track.to_ltrb()
-                bbox = clip_bbox(bbox, frame_width, frame_height)
-
+            if track.is_confirmed() or track.time_since_update <= 1:
+                if track.get_det_conf() is None:
+                    continue     
                 track_id = track.track_id
-                # Get voted label and score from VotingSystem
-                voted_label, voted_score = voting_system.get_voted_label_and_score(track_id)
+                track_class = track.get_det_class()
+                track_conf = track.get_det_conf()
+                voting_system.update_track(track_id,track_class,track_conf)
 
-                # Draw the bounding box with the voted label and score
-                frame = plot_bbox(frame, [bbox], [voted_label], [voted_score])
+            # filter out None values of confs
+                
+            vote_class, avg_score = voting_system.get_voted_label_and_score(track_id)
+            ltrb_box = track.to_ltrb()
+            track_ids.append(track.track_id)
+            deep_sort_boxes.append(ltrb_box)
+            deep_sort_labels.append(vote_class)
+            deep_sort_scores.append(avg_score)
 
-        output.write(frame)  # Write the processed frame to the output video
+        # Draw bounding boxes on the frame
+        drew_frame = plot_bbox(
+            frame,
+            deep_sort_boxes,
+            deep_sort_labels,
+            deep_sort_scores,
+            track_ids,
+        )
+
+        # Write the processed frame to the output video
+        output.write(drew_frame)
         frame_counter += 1  # Increment frame counter
+
 
     cap.release()
     output.release()
