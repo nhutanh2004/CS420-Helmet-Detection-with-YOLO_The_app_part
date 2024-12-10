@@ -15,16 +15,17 @@ class_names = [
 ]
 
 class_colors = [
-    (255, 90, 90),
-    (127, 245, 127),
-    (90, 90, 255),
-    (255, 255, 0),
-    (120, 255, 255),
-    (255, 0, 255),
-    (128, 0, 0),
-    (0, 128, 0),
-    (0, 0, 128),
+    (255, 90, 90),    # Đỏ nhạt (gần hồng nhạt)
+    (255, 165, 0),    # Cam sáng
+    (90, 90, 255),    # Xanh dương đậm
+    (255, 255, 0),    # Vàng sáng
+    (120, 255, 255),  # Xanh ngọc lam nhạt
+    (255, 0, 255),    # Tím hồng (magenta)
+    (128, 0, 0),      # Đỏ thẫm
+    (139, 50, 168),   # Tím
+    (0, 0, 128),      # Xanh navy
 ]
+
 
 
 # Hàm tính toán tỷ lệ font phù hợp
@@ -72,7 +73,7 @@ def plot_bbox(
         color = class_colors[int(label)]
 
         # Create label text (class name and score)
-        label_text = f"{names[label]}:{score*100:.0f} - {track_ids[i]}"
+        label_text = f"{names[label]}: {score*100:.0f}"
         # label_text = f"{names[label]}:{track_ids[i]}"
         max_width = 65 if x2 - x1 < 50 else x2 - x1
         max_width = min(max_width, 180)
