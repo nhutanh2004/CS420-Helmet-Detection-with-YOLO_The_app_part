@@ -12,7 +12,6 @@ from backend.source.utils.visualize import plot_bbox
 from deep_sort_realtime.deepsort_tracker import DeepSort
 # import logging
 from voting_system import VotingSystem
-
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
@@ -58,7 +57,7 @@ def get_model_weights():
 # Create models using the provided weights
 model_weights_list = get_model_weights()
 models, model_names = create_models(model_weights_list)
-
+voting_system = VotingSystem(frame_window=10)
 @app.route("/") 
 def index(): 
     return render_template("home.html") 
@@ -171,6 +170,7 @@ def process_live_stream():
 
     return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+
 @app.route("/process_video", methods=["POST"])
 def process_video():
     if "file" not in request.files:
@@ -191,8 +191,8 @@ def process_video():
         max_age = int(request.form["max_age"])
         n_init = int(request.form["n_init"])
         max_cosine_distance = float(request.form["max_cosine_distance"])
-        max_iou_distance=float(request.form["max_iou_distance"]),
-        nms_max_overlap=float(request.form["max_iou_distance"])
+        max_iou_distance = float(request.form["max_iou_distance"])
+        nms_max_overlap = float(request.form["nms_max_overlap"])
     except (KeyError, ValueError) as e:
         return jsonify({"error": str(e)}), 400
 
@@ -243,7 +243,6 @@ def process_video():
 
         detections = []
         if frame_counter % detection_interval == 0:
-            #logging.info(f"frame_counter: {frame_counter}]")
             # Perform detection with YOLO
             img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             boxes, labels, scores = run_on_frame(models, img_array, "1_1.jpg", iou_thr, skip_box_thr, p)
@@ -257,13 +256,11 @@ def process_video():
                     boxes[i][3] = int(boxes[i][3] * target_height)
                     boxes[i] = xyxy2ltwh(boxes[i])
                     detections.append((boxes[i], scores[i], labels[i]))
-        # for detection in detections:
-        #     logging.info(f"Yolo detection: {detection}")
+                    # Update VotingSystem
+                    voting_system.update_track(i, labels[i], scores[i])
+
         # Update DeepSORT tracker with the latest detections
         tracks = tracker.update_tracks(detections, frame=frame)
-        # for track in tracks:
-        #     logging.info(f"Deepsort ID,state,age: {track.track_id},{track.state},{track.age}")
-        #     logging.info(f"box,score,labels: {track.to_ltrb()},{track.get_det_conf()}, {track.get_det_class()}")
 
         # Process each frame
         for track in tracks:
@@ -272,20 +269,11 @@ def process_video():
                 bbox = clip_bbox(bbox, frame_width, frame_height)
 
                 track_id = track.track_id
-                if track_id not in track_info:
-                    # Store initial label and score
-                    det_label = track.get_det_class()
-                    det_score = track.get_det_conf()
-                    track_info[track_id] = (det_label, det_score)
-                else:
-                    # Use stored label and score
-                    det_label, det_score = track_info[track_id]
+                # Get voted label and score from VotingSystem
+                voted_label, voted_score = voting_system.get_voted_label_and_score(track_id)
 
-                # Log the details for each track
-                # logging.info(f"draw id, box, labels, scores: {track_id}, {bbox}, {det_label}, {det_score}")
-
-                # Draw the bounding box with the stored label and score
-                frame = plot_bbox(frame, [bbox], [det_label], [det_score])
+                # Draw the bounding box with the voted label and score
+                frame = plot_bbox(frame, [bbox], [voted_label], [voted_score])
 
         output.write(frame)  # Write the processed frame to the output video
         frame_counter += 1  # Increment frame counter
@@ -337,6 +325,7 @@ def process_video():
         "original_video_url": f"/static/{filename}",
         "processed_video_url": f"/{compressed_output_path}",
     })
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
