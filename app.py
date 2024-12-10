@@ -75,7 +75,7 @@ if uploaded_file:
     frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
     target_fps = min(30, frame_rate)
     frame_interval = frame_rate / target_fps
-    target_width = 640
+    target_width = 1080
     aspect_ratio = frame_height / frame_width
     target_height = int(target_width * aspect_ratio)
 
