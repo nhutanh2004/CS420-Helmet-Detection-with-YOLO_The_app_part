@@ -1,24 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Upload Video for Object Detection</title>
-        <style>
-            #video-container {
-                display: flex;
-                justify-content: space-between;
-            }
-    
-            .video-box {
-                width: 45%;
-                display: none; /* Hide the video boxes initially */
-            }
-    
-            .video-box video {
-                width: 100%;
-            }
-        </style>
-    </head>
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Video for Object Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
 <body>
     <h1>Upload a Video for Object Detection</h1>
         
