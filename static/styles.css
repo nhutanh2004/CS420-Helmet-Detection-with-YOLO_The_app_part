@@ -2,7 +2,7 @@ body {
     font-family: Arial, sans-serif;
     margin: 20px;
     padding: 0;
-    background-color: rgb(234, 228, 211);
+    background-color: rgb(255, 255, 255);
     color: #333;
     text-align: center;
 }
@@ -69,7 +69,7 @@ form label {
 form input[type="number"],
 form input[type="file"],
 form input[type="submit"] {
-    background-color: rgb(234, 228, 211); /* Adjusted background color */
+    background-color: rgb(255, 255, 255); /* Adjusted background color */
     width: 100%;
     padding: 10px;
     margin-bottom: 10px;
