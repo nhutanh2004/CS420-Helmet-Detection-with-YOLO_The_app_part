@@ -1,39 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Upload Video for Object Detection</title>
-    <style>
-        #video-container {
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .video-box {
-            width: 45%;
-            display: none; /* Hide the video boxes initially */
-        }
-
-        .video-box video {
-            width: 100%;
-        }
-    </style>
-</head>
+    <head>
+        <meta charset="UTF-8">
+        <title>Upload Video for Object Detection</title>
+        <style>
+            #video-container {
+                display: flex;
+                justify-content: space-between;
+            }
+    
+            .video-box {
+                width: 45%;
+                display: none; /* Hide the video boxes initially */
+            }
+    
+            .video-box video {
+                width: 100%;
+            }
+        </style>
+    </head>
 <body>
     <h1>Upload a Video for Object Detection</h1>
-    
+        
     <!-- Form for video upload and parameters -->
     <form id="upload-video-form" action="/process_video" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept="video/*" required>
-        <label for="iou_thr">IoU Threshold:</label>
-        <input type="number" id="iou_thr" name="iou_thr" step="0.01" min="0" max="1" value="0.7" required>
-        <label for="skip_box_thr">Skip Box Threshold:</label>
-        <input type="number" id="skip_box_thr" name="skip_box_thr" step="0.0001" min="0" max="1" value="0.005" required>
-        <label for="p">Minimum Minority Threshold:</label>
-        <input type="number" id="p" name="p" step="0.0001" min="0" max="1" value="0.005" required>
-        <input type="submit" id="submit-button" value="Upload Video">
+        <div style="display: flex; flex-direction: column;">
+            <!-- First Row -->
+            <div style="margin-bottom: 20px;">
+                <input type="file" name="file" accept="video/*" required>
+                <input type="submit" id="submit-button" value="Upload Video">
+            </div>
+            <!-- Second Row -->
+            <div style="margin-bottom: 20px;">
+                <label for="iou_thr">IoU Threshold:</label>
+                <input type="number" id="iou_thr" name="iou_thr" step="0.01" min="0" max="1" value="0.7" required>
+                <label for="skip_box_thr">Skip Box Threshold:</label>
+                <input type="number" id="skip_box_thr" name="skip_box_thr" step="0.0001" min="0" max="1" value="0.005" required>
+                <label for="p">Minimum Minority Threshold:</label>
+                <input type="number" id="p" name="p" step="0.0001" min="0" max="1" value="0.005" required>
+            </div>
+            <!-- Third Row -->
+            <div>
+                <label for="max_age">Max Age:</label>
+                <input type="number" id="max_age" name="max_age" step="1" min="1" value="20" required>
+                <label for="n_init">N Init:</label>
+                <input type="number" id="n_init" name="n_init" step="1" min="1" value="3" required>
+                <label for="max_cosine_distance">Max Cosine Distance:</label>
+                <input type="number" id="max_cosine_distance" name="max_cosine_distance" step="0.01" min="0" max="1" value="0.35" required>
+                <label for="max_iou_distance">Max IoU Distance:</label>
+                <input type="number" id="max_iou_distance" name="max_iou_distance" step="0.01" min="0" max="1" value="0.8" required>
+                <label for="nms_max_overlap">Nms Max Overlap:</label>
+                <input type="number" id="nms_max_overlap" name="nms_max_overlap" step="0.01" min="0" max="1" value="0.7" required>
+            </div>
+        </div>
     </form>
-
+    
+    
     <div id="video-container">
         <div id="original-video-container" class="video-box">
             <h2>Original Video</h2>
