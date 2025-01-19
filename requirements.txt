@@ -1,11 +1,13 @@
-Flask==2.0.1
-ultralytics==8.0.2  # Adjust the version according to your specific needs
-opencv-python==4.5.3.56
-numpy==1.21.1
-Pillow==8.2.0
-torch==1.9.0  # Adjust the version according to your specific needs
-ensemble-boxes==1.0.5
-ffmpeg-python==0.2.0
-tqdm==4.61.2
 deep_sort_realtime==1.3.2
-matplotlib==3.4.2
+ensemble_boxes==1.0.9
+Flask==3.1.0
+matplotlib==3.10.0
+moviepy==2.1.1
+numpy==2.2.2
+opencv_contrib_python==4.10.0.84
+opencv_python==4.10.0.84
+pycocotools==2.0.8
+torch==2.5.1
+tqdm==4.66.5
+ultralytics==8.3.18
+Werkzeug==3.1.3
