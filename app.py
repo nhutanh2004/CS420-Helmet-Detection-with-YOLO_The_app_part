@@ -107,16 +107,27 @@ def process_live_stream():
     tracker = DeepSort(max_age=max_age, nms_max_overlap=nms_max_overlap, n_init=n_init, max_cosine_distance=max_cosine_distance)
     voting_system = VotingSystem(frame_window=frame_window)
 
+    # Determine the next file name
+    files = os.listdir(app.config['UPLOAD_FOLDER'])
+    new_filename = 'output.mp4'
+    video_path = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+    print(f"Video path: {video_path}")  # Add this line for debugging
+
+
     def gen():
         cap = cv2.VideoCapture(file_path)
         if not cap.isOpened():
             print("Error: Could not open video file.")
             return
 
+        # Define the codec and create VideoWriter object to save the video
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(video_path, fourcc, 20.0, (int(cap.get(3)), int(cap.get(4))))
+
         while True:
             ret, frame = cap.read()
             if not ret:
-                print("Error: Could not read frame.")
+                print("Error: Could not read frame or end of stream.")
                 break
 
             # Perform detection with YOLO
@@ -147,28 +158,32 @@ def process_live_stream():
             for track in tracks:
                 if track.is_confirmed() or track.time_since_update <= 1:
                     if track.get_det_conf() is None:
-                        continue     
+                        continue
                     track_id = track.track_id
                     track_class = track.get_det_class()
                     track_conf = track.get_det_conf()
-                    voting_system.update_track(track_id,track_class,track_conf)
+                    voting_system.update_track(track_id, track_class, track_conf)
 
                 # filter out None values of confs
-                    
                 vote_class, avg_score = voting_system.get_voted_label_and_score(track_id)
                 ltrb_box = track.to_ltrb()
                 track_ids.append(track.track_id)
                 deep_sort_boxes.append(ltrb_box)
                 deep_sort_labels.append(vote_class)
                 deep_sort_scores.append(avg_score)
+
             # Draw bounding boxes on the frame
             drew_frame = plot_bbox(
-            frame,
-            deep_sort_boxes,
-            deep_sort_labels,
-            deep_sort_scores,
-            track_ids,
+                frame,
+                deep_sort_boxes,
+                deep_sort_labels,
+                deep_sort_scores,
+                track_ids,
             )
+
+            # Write the frame to the video file
+            out.write(frame)
+
             # Encode frame to JPEG format
             ret, jpeg = cv2.imencode('.jpg', frame)
             if not ret:
@@ -181,8 +196,14 @@ def process_live_stream():
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
 
         cap.release()
+        out.release()
 
     return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route("/download_processed_video", methods=["GET"])
+def download_processed_video():
+    filename = request.args.get('file', 'output.mp4')
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
 
 
 @app.route("/process_video", methods=["POST"])
@@ -370,4 +391,4 @@ def process_video():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port = 5000)
+    app.run(host="0.0.0.0", port=5000)
