@@ -275,7 +275,7 @@ def process_video():
         frame = cv2.resize(frame, (target_width, target_height))
 
         # Skip detection for some frames
-        if frame_counter % detection_interval == 0 or frame_counter <= 5:
+        if frame_counter % detection_interval == 0:
 
             # Convert the frame to RGB
             img_array = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
